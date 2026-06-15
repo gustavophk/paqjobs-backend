@@ -22,6 +22,7 @@ const buscarVagasAdzuna = async (req, res) => {
         redirect_url: vaga.redirect_url,
         company: vaga.company?.display_name || "Empresa Confidencial"//display name foi pq na hora de dar o post está vindo como objeto, ai pega somente o texto
       };
+      console.log(vaga);
       //Salva no banco usando a função registrar vaga
       return registrarVaga(vagaFormatada);
     });

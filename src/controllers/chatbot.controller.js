@@ -12,6 +12,17 @@ const formatVagas = (vagas) => vagas.map(vaga => ({
     descricaoVaga: vaga.description || ''
 }));
 
+const formatVagasHTML = (vagas) => {
+    if (!Array.isArray(vagas) || vagas.length === 0) return '<div></div>';
+    const items = vagas.map(v => {
+        const id = v.IdVaga ?? '';
+        const nome = (v.nomeVaga || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        const desc = (v.descricaoVaga || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        return `<li><h3>${nome}</h3><p>${desc}</p><small>ID: ${id}</small></li>`;
+    }).join('');
+    return `<ul>${items}</ul>`;
+};
+
 //metodo para tentar extrair um array json valido de uma string de resposta da IA
 const tryParseJsonArray = (text) => {
     //verifica se o texto é uma string válida, se não for retorna null
@@ -59,9 +70,9 @@ const converse = async (req, res) => {
                 Sempre que o usuário perguntar sobre vagas disponíveis, empregos ou oportunidades na área de tecnologia, 
                 você deve usar a ferramenta 'buscar_vagas_no_banco' para buscar as vagas disponíveis no banco de dados e fornecer as informações relevantes ao usuário. 
                 O banco de dados é sua única fonte de verdade. Nunca invente, crie ou presuma vagas que não foram retornadas pela ferramenta.
-                Quando retornar a resposta final ao frontend, entregue apenas um JSON array com objetos de vaga, sem texto adicional. 
-                Cada objeto deve conter os campos IdVaga, nomeVaga e descricaoVaga. 
-                Se não houver vagas, retorne uma lista JSON vazia: [].` 
+                Quando retornar a resposta final ao frontend, entregue HTML formatado contendo a lista de vagas (por exemplo, uma lista <ul><li>). 
+                Cada vaga deve apresentar os campos IdVaga, nomeVaga e descricaoVaga dentro das tags HTML apropriadas.
+                Se não houver vagas, retorne um HTML vazio (por exemplo, <div></div>).` 
             },
             {
                 role:"user",
@@ -73,42 +84,52 @@ const converse = async (req, res) => {
         const chatCompletion = await groq.chat.completions.create({
             messages: mensagens,
             model: "llama-3.3-70b-versatile",
-            tools: tools,
-            tool_choice: "auto",//modelo utilizara a ferramenta somente quando determinar que elas sao necessarias para a consulta
+            functions: tools,
+            function_call: "auto",
         });
 
-        //Pegamos a primeira escolha e extraímos a mensagem da IA.
+        // Pegamos a primeira escolha e extraímos a mensagem da IA.
         const firstChoice = chatCompletion.choices?.[0];
         const responseMessage = firstChoice?.message;
-        const respostaDaIA = responseMessage?.message ?? responseMessage;
+        const respostaDaIA = responseMessage ?? firstChoice;
 
-        //Interceptar funções vazadas pela IA
+        // Normaliza respostas de function_call do Groq/OpenAI para o formato esperado.
+        if (responseMessage?.function_call) {
+            respostaDaIA.tool_calls = [{
+                id: 'call_auto_' + Date.now(),
+                type: 'function',
+                function: {
+                    name: responseMessage.function_call.name,
+                    arguments: responseMessage.function_call.arguments || '{}'
+                }
+            }];
+        }
+
+        // Interceptar funções vazadas pela IA em texto, se houver.
         if (respostaDaIA.content && respostaDaIA.content.includes('<function')) {
-            // Procura pelo padrão que a IA imprimiu na tela
             const regexFerramenta = /<function[\(=]?([a-zA-Z0-9_]+)[\)>]?({.*?})<\/function>/s;
             const match = respostaDaIA.content.match(regexFerramenta);
             
             if (match) {
-                console.log(" Interceptamos uma função vazada:", match[1]);
-                // Forçamos a estrutura correta que o nosso código entende
+                console.log("Interceptamos uma função vazada:", match[1]);
                 respostaDaIA.tool_calls = [{
                     id: 'call_fallback_' + Date.now(),
                     type: 'function',
                     function: {
-                        name: match[1], // Pega o nome: buscar_vagas_no_banco
-                        arguments: match[2] // Pega o JSON: {"cargo": "estágio"}
+                        name: match[1],
+                        arguments: match[2]
                     }
                 }];
-                respostaDaIA.content = ""; // Limpa o texto sujo para não aparecer no chat
+                respostaDaIA.content = "";
             }
         }
-        // --- FIM DO INTERCEPTADOR ---
+
         if (!respostaDaIA) {
             console.error('Resposta inesperada da IA:', chatCompletion);
             return res.status(500).json({ erro: 'Resposta inválida da IA.' });
         }
 
-        //a IA quer usar a ferramenta?
+        // a IA quer usar a ferramenta?
         if (respostaDaIA.tool_calls && respostaDaIA.tool_calls.length) {
             const toolCall = respostaDaIA.tool_calls[0];
             const argumentosDaIA = typeof toolCall.function.arguments === 'string'
@@ -135,12 +156,12 @@ const converse = async (req, res) => {
 
             mensagens.push(respostaDaIA);
             
-            // Devolvemos para a IA apenas as vagas reduzidas
+            // Devolvemos para a IA apenas as vagas reduzidas (em HTML formatado)
             mensagens.push({
-                role: 'tool',
                 tool_call_id: toolCall.id,
+                role: 'tool',
                 name: toolCall.function.name,
-                content: JSON.stringify(vagasEnxutas) 
+                content: formatVagasHTML(vagasEnxutas)
             });
 
             //A IA processa a resposta da ferramenta e gera uma resposta final para o usuário
@@ -151,11 +172,17 @@ const converse = async (req, res) => {
 
             const finalMessage = respostaFinal.choices?.[0]?.message?.content
                 ?? respostaFinal.choices?.[0]?.message;
-            
-            
+
+            // Se a IA retornou HTML (começa com <), devolvemos diretamente
+            if (typeof finalMessage === 'string' && finalMessage.trim().startsWith('<')) {
+                return res.status(200).json({ resposta: finalMessage });
+            }
+
             const parsedJson = tryParseJsonArray(finalMessage);
             const vagasParaMostrar = parsedJson || formatVagas(vagasDoBanco);
 
+            console.log(finalMessage);
+            console.log(vagasDoBanco);
             if (vagasParaMostrar && vagasParaMostrar.length > 0) {
                 // Monta um texto bonito com as vagas para o Front-end ler sem quebrar
                 let textoAmigavel = "Aqui estão as vagas que encontrei para você:\n\n";
