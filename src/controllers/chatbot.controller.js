@@ -1,3 +1,5 @@
+//controller do chatbot
+
 //importando groq
 const Groq = require("groq-sdk");
 const groq = new Groq({ apiKey: process.env.KEY_GROQ });
@@ -171,7 +173,7 @@ const converse = async (req, res) => {
         // Devolvemos para o front-end parar de carregar caso a IA não tenha usado nenhuma ferramenta
         const reply = respostaDaIA.content ?? respostaDaIA.text ?? respostaDaIA;
         res.status(200).json({ resposta: reply });     
-           
+
     } catch (error) {
         console.error("Erro na API do Groq:", error);
         if (error?.response) {
@@ -200,3 +202,4 @@ const converse = async (req, res) => {
 module.exports = {
     converse
 };
+
