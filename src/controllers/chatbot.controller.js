@@ -164,6 +164,7 @@ const converse = async (req, res) => {
                 content: formatVagasHTML(vagasEnxutas)
             });
 
+            
             //A IA processa a resposta da ferramenta e gera uma resposta final para o usuário
             const respostaFinal = await groq.chat.completions.create({
                 messages: mensagens,
