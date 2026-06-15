@@ -113,6 +113,8 @@ const converse = async (req, res) => {
                 ? JSON.parse(toolCall.function.arguments)
                 : (toolCall.function.arguments || {});
 
+            const termoBusca = argumentosDaIA.cargo || '';
+
             // Buscamos no MongoDB limitando a apenas 5 resultados
             const vagasDoBanco = await Vaga.find({
                 $or: [
@@ -147,18 +149,29 @@ const converse = async (req, res) => {
 
             const finalMessage = respostaFinal.choices?.[0]?.message?.content
                 ?? respostaFinal.choices?.[0]?.message;
+            
+            
             const parsedJson = tryParseJsonArray(finalMessage);
-            if (parsedJson) {
-                return res.status(200).json(parsedJson);
+            const vagasParaMostrar = parsedJson || formatVagas(vagasDoBanco);
+
+            if (vagasParaMostrar && vagasParaMostrar.length > 0) {
+                // Monta um texto bonito com as vagas para o Front-end ler sem quebrar
+                let textoAmigavel = "Aqui estão as vagas que encontrei para você:\n\n";
+                
+                vagasParaMostrar.forEach(vaga => {
+                    textoAmigavel += `🔹 **${vaga.nomeVaga}**\n${vaga.descricaoVaga}\n\n`;
+                });
+
+                // Devolve no formato exato que o Front-end espera: { resposta: "texto" }
+                return res.status(200).json({ resposta: textoAmigavel });
+            } else {
+                return res.status(200).json({ resposta: "Poxa, não encontrei nenhuma vaga com esses requisitos no momento." });
             }
-
-            return res.status(200).json(formatVagas(vagasDoBanco));
         }
-
-        //Devolvemos para o Postman parar de carregar
+        // Devolvemos para o front-end parar de carregar caso a IA não tenha usado nenhuma ferramenta
         const reply = respostaDaIA.content ?? respostaDaIA.text ?? respostaDaIA;
-        res.status(200).json({ resposta: reply });
-
+        res.status(200).json({ resposta: reply });     
+           
     } catch (error) {
         console.error("Erro na API do Groq:", error);
         if (error?.response) {
