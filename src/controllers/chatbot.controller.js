@@ -188,8 +188,9 @@ const converse = async (req, res) => {
                 // Monta um texto bonito com as vagas para o Front-end ler sem quebrar
                 let textoAmigavel = "Aqui estão as vagas que encontrei para você:\n\n";
                 
+                // formata cada vaga
                 vagasParaMostrar.forEach(vaga => {
-                    textoAmigavel += `🔹 **${vaga.nomeVaga}**\n${vaga.descricaoVaga}\n\n`;
+                    textoAmigavel += `🔹 <b>${vaga.nomeVaga}</b>\n${vaga.descricaoVaga}\n\n`;
                 });
 
                 // Devolve no formato exato que o Front-end espera: { resposta: "texto" }
