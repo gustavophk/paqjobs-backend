@@ -190,7 +190,7 @@ const converse = async (req, res) => {
                 
                 // formata cada vaga
                 vagasParaMostrar.forEach(vaga => {
-                    textoAmigavel += `🔹 <b>${vaga.nomeVaga}</b>\n${vaga.descricaoVaga}<br><br>`;
+                    textoAmigavel += `🔹 <b>${vaga.nomeVaga}</b>\n${vaga.descricaoVaga}\n\n`;
                 });
 
                 // Devolve no formato exato que o Front-end espera: { resposta: "texto" }
