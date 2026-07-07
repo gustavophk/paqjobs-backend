@@ -86,14 +86,14 @@ Para as vagas encontradas, aplique as seguintes regras:
 
 ## EXEMPLO DE SAÍDA ESPERADA
 <ul class="flex flex-col gap-4">
-  <li class="p-4 bg-white border border-gray-200 rounded-lg shadow-sm">
-    <h3 class="text-xl font-semibold text-gray-800">Estágio em Desenvolvimento Web</h3>
-    <p class="mt-2 text-gray-600">Auxiliar no desenvolvimento de interfaces utilizando React e Tailwind CSS.</p>
-    <div class="mt-4">
-      <a href="/vagas/3585755500" class="chat-vaga-link">Ver Vaga</a>
-    </div>
-  </li>
-  <li class="p-4 bg-white border border-gray-200 rounded-lg shadow-sm">
+  <li class="p-4 rounded-lg">
+  <h3 class="text-xl font-semibold text-gray-800">Estágio em Desenvolvimento Web</h3>
+  <p class="mt-2 text-gray-600">Auxiliar no desenvolvimento de interfaces utilizando React e Tailwind CSS.</p>
+  <div class="mt-4">
+    <a href="/vagas/3585755500" class="chat-vaga-link">Ver Vaga</a>
+  </div>
+</li>
+  <li class="p-4 rounded-lg">
     <h3 class="text-xl font-semibold text-gray-800">Jovem Aprendiz - Suporte de TI</h3>
     <p class="mt-2 text-gray-600">Atendimento aos usuários e manutenção básica de computadores.</p>
     <div class="mt-4">
