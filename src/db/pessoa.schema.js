@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 
+//define a estrutura de uma pessoa no MongoDB
 const pessoaSchema = new mongoose.Schema({
   _id: { type: Number, required: true },
   name: { type: String, required: true },

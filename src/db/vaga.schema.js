@@ -1,6 +1,6 @@
 const mongoose = require('mongoose');
 
-//schema usando mongoose
+//define a estrutura de uma vaga no MongoDB
 const vagaSchema = new mongoose.Schema({
   name: {type:String, required: true},
   _id: {type: Number, required: true},

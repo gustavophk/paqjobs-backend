@@ -1,5 +1,6 @@
 const Vaga = require('../../db/vaga.schema');
 
+//buscar vagas no banco
 const buscarVagas = async (req, res) =>{
   try{
     const search = req.query.search || req.query.q || '';

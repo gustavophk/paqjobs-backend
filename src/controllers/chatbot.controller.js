@@ -6,12 +6,14 @@ const groq = new Groq({ apiKey: process.env.KEY_GROQ });
 const Vaga = require('../db/vaga.schema');
 const {tools} = require('../services/tools.service');
 
+//metodo para formatar as vagas em um array de objetos com campos específicos
 const formatVagas = (vagas) => vagas.map(vaga => ({
     IdVaga: vaga.id_vaga_external ?? vaga._id ?? null,
     nomeVaga: vaga.title || vaga.name || '',
     descricaoVaga: vaga.description || ''
 }));
 
+//metodo para formatar as vagas em HTML com classes do Tailwind CSS
 const formatVagasHTML = (vagas) => {
     if (!Array.isArray(vagas) || vagas.length === 0) return '<div></div>';
     const items = vagas.map(v => {

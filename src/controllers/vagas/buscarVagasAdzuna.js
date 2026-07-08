@@ -1,7 +1,7 @@
 const axios = require('axios');
 const {registrarVaga} = require('../../services/vaga.service');
 
-// metodo http get para buscar vagas da api adzuna
+// metodo http get para buscar vagas da api adzuna e salva no banco
 const buscarVagasAdzuna = async (req, res) => {
   try{
     //variavel para dados da adzuna utilizando .env
@@ -10,7 +10,7 @@ const buscarVagasAdzuna = async (req, res) => {
     const resposta = await axios.get(urlAdzuna);
     const vagasExternas = resposta.data.results;
 
-    //A REPENSAR
+    
     //Mapeamento de adzuna para o MongoDB
     const promessasDeRegistro = vagasExternas.map(vaga => {
       const vagaFormatada = {
