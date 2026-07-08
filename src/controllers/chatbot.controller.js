@@ -78,7 +78,7 @@ A sua resposta final deve ser EXCLUSIVAMENTE em código HTML válido, utilizando
 
 Para as vagas encontradas, aplique as seguintes regras:
 - Envolva as vagas em uma lista <ul> com classes de espaçamento do Tailwind (ex: flex flex-col gap-4).
-- Cada vaga deve ser um <li> com visual de card (ex: p-4 bg-white border border-gray-200 rounded-lg shadow-sm).
+- Cada vaga deve ser um <li>.
 - Mostre o nomeVag em um título (ex: <h3 class="text-xl font-semibold text-gray-800">).
 - Mostre a descricaoVaga em um parágrafo (ex: <p class="mt-2 text-gray-600">).
 - **REGRA CRÍTICA PARA LINKS:** O botão/link para a vaga DEVE OBRIGATORIAMENTE seguir esta exata estrutura e classe, substituindo {IdVaga} pelo ID real da vaga:
