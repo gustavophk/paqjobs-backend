@@ -4,7 +4,7 @@ const tools = [
     {
         name: "buscar_vagas_no_banco",
         description: `Buscando vagas de estagio ou jovem aprendiz no banco de dados. 
-            Usar essa tool sempre que o usuário perguntar sobre vagas disponiveis, empregos ou oportunidades.`,
+            Usar essa tool sempre que o usuário perguntar sobre vagas disponiveis, empregos ou oportunidades em tecnologia, inclusive sem acentuação (ex: estagio, jovem aprendiz).`,
         parameters: {
             type: "object",
             properties: {

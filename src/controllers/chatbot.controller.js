@@ -25,6 +25,17 @@ const formatVagasHTML = (vagas) => {
     return `<ul>${items}</ul>`;
 };
 
+const stripAccents = (text = '') => {
+    return text
+        .toString()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '');
+};
+
+const normalizeText = (text = '') => {
+    return stripAccents(text).toLowerCase().trim();
+};
+
 //metodo para tentar extrair um array json valido de uma string de resposta da IA
 const tryParseJsonArray = (text) => {
     //verifica se o texto é uma string válida, se não for retorna null
@@ -69,8 +80,11 @@ const converse = async (req, res) => {
             {
                 role:"system",
                 content: `Você é um assistente virtual especializado em conectar pessoas a vagas de estágio e jovem aprendiz na área de tecnologia. 
-## COMPORTAMENTO GERAL
+
+## COMPORTAMENTO GERAL E COMPREENSÃO
 1. Você deve ser amigável, prestativo e focado em carreiras de tecnologia. Se o usuário apenas saudar ("Olá", "Tudo bem?"), responda cordialmente e se coloque à disposição para ajudar a encontrar vagas.
+2. Tolerância a acentuação: O usuário pode digitar de forma informal, sem acentos ou pontuação (ex: "estagio", "programacao", "junior"). Interprete essas palavras ou outras com o mesmo peso e significado de suas versões gramaticalmente corretas.
+3. Contexto Padrão (Foco em Tecnologia): Se o usuário pedir vagas de forma genérica, sem especificar a área (ex: "Quero vagas de estagiário", "Tem vaga de jovem aprendiz?"), ASSUMA implicitamente que ele está buscando vagas na área de Tecnologia, TI ou Programação. Ao usar a ferramenta de busca, aplique esse filtro tecnológico.
 
 ## REGRAS DE USO DA FERRAMENTA
 1. Sempre que o usuário perguntar sobre vagas, empregos, oportunidades ou pedir indicações de carreira, você DEVE utilizar a ferramenta 'buscar_vagas_no_banco'.
@@ -79,7 +93,7 @@ const converse = async (req, res) => {
 ## REGRAS DE FORMATAÇÃO (EXCLUSIVO PARA QUANDO RETORNAR VAGAS)
 Se a ferramenta for acionada e retornar vagas, sua resposta deve conter APENAS o código HTML válido com as vagas encontradas, utilizando classes utilitárias do Tailwind CSS, sem saudações ou explicações textuais fora do HTML.
 
-- Envolva as vagas em uma lista <ul> com as classes: flex flex-col gap-4.
+- Envolva as vagas em uma lista <ul class="flex flex-col gap-4">.
 - Cada vaga deve ser um <li>.
 - Mostre o nomeVag em um título: <h3 class="text-xl font-semibold text-gray-800">.
 - Mostre a descricaoVaga em um parágrafo: <p class="mt-2 text-gray-600">.
@@ -151,16 +165,37 @@ Se o usuário pediu por vagas, a ferramenta foi executada, mas o banco de dados 
                 ? JSON.parse(toolCall.function.arguments)
                 : (toolCall.function.arguments || {});
 
-            const termoBusca = argumentosDaIA.cargo || '';
+            const escapeRegex = (text = '') => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const buildSearchTerms = (raw = '') => {
+                const normalized = normalizeText(raw);
+                const terms = new Set();
+                if (normalized) {
+                    terms.add(normalized);
+                    terms.add(stripAccents(normalized));
+                }
+                const vacancySynonyms = ['estágio', 'estagio', 'estagiário', 'estagiario', 'jovem aprendiz', 'aprendiz', 'vaga', 'vagas', 'emprego', 'oportunidade', 'trainee'];
+                vacancySynonyms.forEach((term) => {
+                    if (!normalized || normalized.includes(normalizeText(term))) {
+                        terms.add(term);
+                    }
+                });
+                return Array.from(terms).filter(Boolean);
+            };
 
-            // Buscamos no MongoDB limitando a apenas 5 resultados
-            const vagasDoBanco = await Vaga.find({
-                $or: [
-                    { title: new RegExp(termoBusca, 'i') },
-                    { name: new RegExp(termoBusca, 'i') },
-                    { description: new RegExp(termoBusca, 'i') }
-                ]
-            }).limit(5); // Limite adicionado
+            const searchVagasNoBanco = async (rawSearchText = '') => {
+                const searchTerms = buildSearchTerms(rawSearchText);
+                const regexes = searchTerms.map(term => new RegExp(escapeRegex(term), 'i'));
+                return await Vaga.find({
+                    $or: [
+                        ...regexes.map(regex => ({ title: regex })),
+                        ...regexes.map(regex => ({ name: regex })),
+                        ...regexes.map(regex => ({ description: regex })),
+                    ]
+                }).limit(5);
+            };
+
+            const termoBusca = argumentosDaIA.cargo || '';
+            const vagasDoBanco = await searchVagasNoBanco(termoBusca || userMessage);
 
             // Encurtamos a descrição para economizar tokens do Groq
             const vagasEnxutas = vagasDoBanco.map(vaga => ({
@@ -214,9 +249,57 @@ Se o usuário pediu por vagas, a ferramenta foi executada, mas o banco de dados 
                 return res.status(200).json({ resposta: "Poxa, não encontrei nenhuma vaga com esses requisitos no momento." });
             }
         }
-        // Devolvemos para o front-end parar de carregar caso a IA não tenha usado nenhuma ferramenta
-        const reply = respostaDaIA.content ?? respostaDaIA.text ?? respostaDaIA;
-        res.status(200).json({ resposta: reply });     
+        const reply = typeof respostaDaIA === 'string'
+            ? respostaDaIA
+            : (respostaDaIA.content ?? respostaDaIA.text ?? '');
+
+        const normalizedReply = reply.toString().trim();
+        const normalizedUserMessage = normalizeText(userMessage);
+        const userAskedVagas = ['vaga', 'vagas', 'estagio', 'estágio', 'estagiario', 'estagiário', 'jovem aprendiz', 'aprendiz', 'emprego', 'oportunidade']
+            .some(keyword => normalizedUserMessage.includes(normalizeText(keyword)));
+
+        if (!normalizedReply && userAskedVagas) {
+            const escapeRegex = (text = '') => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const buildSearchTerms = (raw = '') => {
+                const normalized = normalizeText(raw);
+                const terms = new Set();
+                if (normalized) {
+                    terms.add(normalized);
+                    terms.add(stripAccents(normalized));
+                }
+                const vacancySynonyms = ['estágio', 'estagio', 'estagiário', 'estagiario', 'jovem aprendiz', 'aprendiz', 'vaga', 'vagas', 'emprego', 'oportunidade', 'trainee'];
+                vacancySynonyms.forEach((term) => {
+                    if (!normalized || normalized.includes(normalizeText(term))) {
+                        terms.add(term);
+                    }
+                });
+                return Array.from(terms).filter(Boolean);
+            };
+            const searchVagasNoBancoFallback = async (rawSearchText = '') => {
+                const searchTerms = buildSearchTerms(rawSearchText);
+                const regexes = searchTerms.map(term => new RegExp(escapeRegex(term), 'i'));
+                return await Vaga.find({
+                    $or: [
+                        ...regexes.map(regex => ({ title: regex })),
+                        ...regexes.map(regex => ({ name: regex })),
+                        ...regexes.map(regex => ({ description: regex })),
+                    ]
+                }).limit(5);
+            };
+
+            const vagasDoBanco = await searchVagasNoBancoFallback(userMessage);
+            if (vagasDoBanco && vagasDoBanco.length > 0) {
+                let textoAmigavel = 'Aqui estão as vagas que encontrei para você:\n\n';
+                vagasDoBanco.forEach(vaga => {
+                    textoAmigavel += `🔹 <b>${vaga.title || vaga.name || ''}</b>\n${vaga.description || ''}<br><br>`;
+                });
+                return res.status(200).json({ resposta: textoAmigavel });
+            }
+
+            return res.status(200).json({ resposta: 'Poxa, não encontrei nenhuma vaga com esses requisitos no momento.' });
+        }
+
+        res.status(200).json({ resposta: reply || 'Desculpe, não consegui entender sua solicitação.' });     
 
     } catch (error) {
         console.error("Erro na API do Groq:", error);
